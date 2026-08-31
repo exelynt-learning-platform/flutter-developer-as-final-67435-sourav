@@ -25,54 +25,58 @@ class EmployeeDashboardPage extends StatefulWidget {
 
 class _EmployeeDashboardPageState
     extends State<EmployeeDashboardPage> {
-  late final EmployeeCubit cubit;
-
   final searchController = TextEditingController();
   final filterText = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-
-    cubit = sl<EmployeeCubit>();
-    cubit.load();
-  }
 
   @override
   void dispose() {
     searchController.dispose();
     filterText.dispose();
-    cubit.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: cubit,
-      child: Scaffold(
-        appBar: _buildAppBar(context),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _openEmployeeForm(context),
-          icon: const Icon(Icons.add),
-          label: const Text('Add Employee'),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              EmployeeSearchFilter(
-                searchController: searchController,
-                filterController: filterText,
-                onSearchChanged: cubit.searchId,
-                onFilterChanged: cubit.filter,
+    return BlocProvider<EmployeeCubit>(
+      create: (_) {
+        final cubit = sl<EmployeeCubit>();
+        cubit.load();
+        return cubit;
+      },
+      child: Builder(
+        builder: (context) {
+          final cubit = context.read<EmployeeCubit>();
+
+          return Scaffold(
+            appBar: _buildAppBar(context),
+
+            floatingActionButton:
+            FloatingActionButton.extended(
+              onPressed: () => _openEmployeeForm(context),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Employee'),
+            ),
+
+            body: SafeArea(
+              child: Column(
+                children: [
+                  EmployeeSearchFilter(
+                    searchController: searchController,
+                    filterController: filterText,
+                    onSearchChanged: cubit.searchId,
+                    onFilterChanged: cubit.filter,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Expanded(
+                    child: _buildEmployeeContent(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: _buildEmployeeContent(),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -80,28 +84,43 @@ class _EmployeeDashboardPageState
   Widget _buildEmployeeContent() {
     return BlocBuilder<EmployeeCubit, EmployeeState>(
       builder: (context, state) {
+        final cubit = context.read<EmployeeCubit>();
+
+        // -----------------------------------------------------------
+        // Loading
+        // -----------------------------------------------------------
+
         if (state.status == EmployeeStatus.loading) {
           return const EmployeeLoadingState();
         }
 
+        // -----------------------------------------------------------
+        // Error
+        // -----------------------------------------------------------
+
         if (state.status == EmployeeStatus.error) {
           return EmployeeErrorState(
-            message: state.errorMessage ?? 'Something Went Wrong',
+            message: state.errorMessage ?? "SomeThing Went Wrong",
             onRetry: cubit.load,
           );
         }
 
-        if (state.status == EmployeeStatus.success) {
-          final employees = state.visible;
 
-          if (employees.isEmpty) {
+        // -----------------------------------------------------------
+        // Loaded
+        // -----------------------------------------------------------
+
+        if (state.status == EmployeeStatus.success) {
+          final visibleEmployees = state.visible;
+
+          if (visibleEmployees.isEmpty) {
             return const EmployeeEmptyState(
               message: 'No employees match your search.',
             );
           }
 
           return EmployeeGrid(
-            employees: employees,
+            employees: visibleEmployees,
             onView: _viewEmployee,
             onEdit: _editEmployee,
             onDelete: _deleteEmployee,
@@ -113,54 +132,6 @@ class _EmployeeDashboardPageState
       },
     );
   }
-
-  // List<Employee> _filteredEmployees(
-  //     EmployeeLoaded state,
-  //     ) {
-  //   var employees = state.employees;
-  //
-  //   if (state.searchId.trim().isNotEmpty) {
-  //     employees = employees
-  //         .where(
-  //           (employee) =>
-  //       employee.id == state.searchId.trim(),
-  //     )
-  //         .toList();
-  //   }
-  //
-  //   if (state.filterText.trim().isNotEmpty) {
-  //     final text = state.filterText.trim().toLowerCase();
-  //
-  //     employees = employees.where((employee) {
-  //       switch (state.filter) {
-  //         case 'Name':
-  //           return employee.name
-  //               .toLowerCase()
-  //               .contains(text);
-  //
-  //         case 'Email':
-  //           return employee.email
-  //               .toLowerCase()
-  //               .contains(text);
-  //
-  //         case 'Mobile':
-  //           return employee.mobile
-  //               .toLowerCase()
-  //               .contains(text);
-  //
-  //         case 'Country':
-  //           return employee.country
-  //               .toLowerCase()
-  //               .contains(text);
-  //
-  //         default:
-  //           return true;
-  //       }
-  //     }).toList();
-  //   }
-  //
-  //   return employees;
-  // }
 
   PreferredSizeWidget _buildAppBar(
       BuildContext context,
@@ -179,7 +150,9 @@ class _EmployeeDashboardPageState
     );
   }
 
-  Future<void> _openEmployeeForm(BuildContext context) async {
+  Future<void> _openEmployeeForm(
+      BuildContext context,
+      ) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -189,22 +162,25 @@ class _EmployeeDashboardPageState
 
     if (!mounted) return;
 
-    await cubit.load();
+    context.read<EmployeeCubit>().load();
   }
 
-  Future<void> _viewEmployee(Employee employee) async {
+  Future<void> _viewEmployee(
+      Employee employee,
+      ) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EmployeeFormPage(
           employee: employee,
-          readOnly: true,
         ),
       ),
     );
   }
 
-  Future<void> _editEmployee(Employee employee) async {
+  Future<void> _editEmployee(
+      Employee employee,
+      ) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -216,7 +192,7 @@ class _EmployeeDashboardPageState
 
     if (!mounted) return;
 
-    await cubit.load();
+    context.read<EmployeeCubit>().load();
   }
 
   Future<void> _deleteEmployee(
@@ -229,7 +205,7 @@ class _EmployeeDashboardPageState
 
     if (!confirmed || !mounted) return;
 
-    final success = await cubit.remove(
+    final success = await context.read<EmployeeCubit>().remove(
       employee.id,
     );
 

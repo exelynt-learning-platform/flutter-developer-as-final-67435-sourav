@@ -82,6 +82,10 @@ class AuthCubit extends Cubit<AuthState> {
   // SIGN IN
   // ==========================================================================
 
+  // ===============================================================
+// SIGN IN
+// ===============================================================
+
   Future<void> signIn(
       String email,
       String password,
@@ -94,20 +98,19 @@ class AuthCubit extends Cubit<AuthState> {
         password,
       );
 
-      if (result.isSuccess && result.user != null) {
+      if (!result.isSuccess) {
         emit(
-          Authenticated(result.user!),
+          AuthFailure(
+            result.failure?.message ??
+                'Unable to sign in.',
+          ),
         );
-
-        return;
       }
 
-      emit(
-        AuthFailure(
-          result.failure?.message ??
-              'Unable to sign in.',
-        ),
-      );
+      // Do NOT emit Authenticated here.
+      //
+      // Successful Firebase sign-in changes the authentication
+      // state, and authStateChanges() will emit Authenticated.
     } on AppFailure catch (failure) {
       emit(
         AuthFailure(
@@ -127,6 +130,10 @@ class AuthCubit extends Cubit<AuthState> {
   // REGISTER
   // ==========================================================================
 
+  // ===============================================================
+// REGISTER
+// ===============================================================
+
   Future<void> register(
       String name,
       String email,
@@ -141,20 +148,19 @@ class AuthCubit extends Cubit<AuthState> {
         password,
       );
 
-      if (result.isSuccess && result.user != null) {
+      if (!result.isSuccess) {
         emit(
-          Authenticated(result.user!),
+          AuthFailure(
+            result.failure?.message ??
+                'Unable to create account.',
+          ),
         );
-
-        return;
       }
 
-      emit(
-        AuthFailure(
-          result.failure?.message ??
-              'Unable to create account.',
-        ),
-      );
+      // Do NOT emit Authenticated here.
+      //
+      // authStateChanges() will emit Authenticated
+      // after Firebase authentication succeeds.
     } on AppFailure catch (failure) {
       emit(
         AuthFailure(
@@ -174,26 +180,29 @@ class AuthCubit extends Cubit<AuthState> {
   // GOOGLE SIGN IN
   // ==========================================================================
 
+  // ===============================================================
+// GOOGLE SIGN IN
+// ===============================================================
+
   Future<void> google() async {
     emit(AuthLoading());
 
     try {
       final result = await googleUseCase();
 
-      if (result.isSuccess && result.user != null) {
+      if (!result.isSuccess) {
         emit(
-          Authenticated(result.user!),
+          AuthFailure(
+            result.failure?.message ??
+                'Unable to sign in with Google.',
+          ),
         );
-
-        return;
       }
 
-      emit(
-        AuthFailure(
-          result.failure?.message ??
-              'Unable to sign in with Google.',
-        ),
-      );
+      // Do NOT emit Authenticated here.
+      //
+      // Firebase authStateChanges() will emit Authenticated
+      // when the Google authentication succeeds.
     } on AppFailure catch (failure) {
       emit(
         AuthFailure(
