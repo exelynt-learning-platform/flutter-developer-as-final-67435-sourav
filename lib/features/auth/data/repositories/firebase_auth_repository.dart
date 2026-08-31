@@ -189,14 +189,21 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<AppFailure?> signOut() async {
     try {
-      await Future.wait([
-        auth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
-
-      return null;
+      // Firebase logout is the important operation.
+      await auth.signOut();
     } catch (e) {
       return _failure(e);
     }
+
+    try {
+      // Google logout is cleanup and should not prevent
+      // the Firebase session from being terminated.
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // Ignore Google Sign-In cleanup failure because
+      // the Firebase user has already been signed out.
+    }
+
+    return null;
   }
 }

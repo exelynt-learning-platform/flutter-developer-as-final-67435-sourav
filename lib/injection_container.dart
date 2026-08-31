@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/network/dio_client.dart';
 import 'features/auth/data/repositories/firebase_auth_repository.dart';
 import 'features/auth/data/repositories/unavailable_auth_repository.dart';
@@ -23,31 +24,166 @@ import 'features/employees/presentation/bloc/employee_cubit.dart';
 final sl = GetIt.instance;
 
 Future<void> configureDependencies() async {
-  final box = await Hive.openBox<String>('employee_cache');
-  sl.registerLazySingleton<Dio>(() => DioClient().dio);
+  // ---------------------------------------------------------------
+  // Local persistence
+  // ---------------------------------------------------------------
+
+  final box = await Hive.openBox<String>(
+    'employee_cache',
+  );
+
+  final prefs = await SharedPreferences.getInstance();
+
+  sl.registerLazySingleton<SharedPreferences>(
+        () => prefs,
+  );
+
+  // ---------------------------------------------------------------
+  // Network
+  // ---------------------------------------------------------------
+
+  sl.registerLazySingleton<Dio>(
+        () => DioClient().dio,
+  );
+
+  // ---------------------------------------------------------------
+  // Firebase Authentication
+  // ---------------------------------------------------------------
+
   final firebaseReady = Firebase.apps.isNotEmpty;
+
   if (firebaseReady) {
-    sl.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
-    sl.registerLazySingleton<GoogleSignIn>(() => GoogleSignIn(scopes: ['email']));
-    sl.registerLazySingleton<AuthRepository>(() => FirebaseAuthRepository(auth: sl(), googleSignIn: sl()));
+    sl.registerLazySingleton<FirebaseAuth>(
+          () => FirebaseAuth.instance,
+    );
+
+    sl.registerLazySingleton<GoogleSignIn>(
+          () => GoogleSignIn(
+        scopes: ['email'],
+      ),
+    );
+
+    sl.registerLazySingleton<AuthRepository>(
+          () => FirebaseAuthRepository(
+        auth: sl<FirebaseAuth>(),
+        googleSignIn: sl<GoogleSignIn>(),
+      ),
+    );
   } else {
-    sl.registerLazySingleton<AuthRepository>(() => const UnavailableAuthRepository());
+    sl.registerLazySingleton<AuthRepository>(
+          () => const UnavailableAuthRepository(),
+    );
   }
-  sl.registerLazySingleton(() => SignInUseCase(sl()));
-  sl.registerLazySingleton(() => RegisterUseCase(sl()));
-  sl.registerLazySingleton(() => GoogleSignInUseCase(sl()));
-  sl.registerLazySingleton(() => ResetPasswordUseCase(sl()));
-  sl.registerLazySingleton(() => SignOutUseCase(sl()));
-  sl.registerFactory(() => AuthCubit(repository: sl(), signInUseCase: sl(), registerUseCase: sl(), googleUseCase: sl(), resetUseCase: sl(), signOutUseCase: sl()));
-  sl.registerLazySingleton<EmployeeRemoteDataSource>(() => EmployeeRemoteDataSource(sl()));
-  sl.registerLazySingleton<CountryRemoteDataSource>(() => CountryRemoteDataSource(sl()));
-  sl.registerLazySingleton<CountryRepository>(() => CountryRepositoryImpl(sl()));
-  sl.registerFactory(() => CountryCubit(sl()));
-  sl.registerLazySingleton<EmployeeRepository>(() => EmployeeRepositoryImpl(remote: sl(), cache: box));
-  sl.registerLazySingleton(() => GetEmployees(sl()));
-  sl.registerLazySingleton(() => GetEmployeeById(sl()));
-  sl.registerLazySingleton(() => CreateEmployee(sl()));
-  sl.registerLazySingleton(() => UpdateEmployee(sl()));
-  sl.registerLazySingleton(() => DeleteEmployee(sl()));
-  sl.registerFactory(() => EmployeeCubit(getEmployees: sl(), getById: sl(), createEmployee: sl(), updateEmployee: sl(), deleteEmployee: sl()));
+
+  // ---------------------------------------------------------------
+  // Authentication Use Cases
+  // ---------------------------------------------------------------
+
+  sl.registerLazySingleton(
+        () => SignInUseCase(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => RegisterUseCase(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => GoogleSignInUseCase(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => ResetPasswordUseCase(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => SignOutUseCase(sl()),
+  );
+
+  // ---------------------------------------------------------------
+  // Authentication Cubit
+  // ---------------------------------------------------------------
+
+  sl.registerFactory(
+        () => AuthCubit(
+      repository: sl(),
+      signInUseCase: sl(),
+      registerUseCase: sl(),
+      googleUseCase: sl(),
+      resetUseCase: sl(),
+      signOutUseCase: sl(),
+    ),
+  );
+
+  // ---------------------------------------------------------------
+  // Employee Remote Data Sources
+  // ---------------------------------------------------------------
+
+  sl.registerLazySingleton<EmployeeRemoteDataSource>(
+        () => EmployeeRemoteDataSource(sl()),
+  );
+
+  sl.registerLazySingleton<CountryRemoteDataSource>(
+        () => CountryRemoteDataSource(sl()),
+  );
+
+  // ---------------------------------------------------------------
+  // Country
+  // ---------------------------------------------------------------
+
+  sl.registerLazySingleton<CountryRepository>(
+        () => CountryRepositoryImpl(sl()),
+  );
+
+  sl.registerFactory(
+        () => CountryCubit(sl()),
+  );
+
+  // ---------------------------------------------------------------
+  // Employee Repository
+  // ---------------------------------------------------------------
+
+  sl.registerLazySingleton<EmployeeRepository>(
+        () => EmployeeRepositoryImpl(
+      remote: sl(),
+      cache: box,
+    ),
+  );
+
+  // ---------------------------------------------------------------
+  // Employee Use Cases
+  // ---------------------------------------------------------------
+
+  sl.registerLazySingleton(
+        () => GetEmployees(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => GetEmployeeById(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => CreateEmployee(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => UpdateEmployee(sl()),
+  );
+
+  sl.registerLazySingleton(
+        () => DeleteEmployee(sl()),
+  );
+
+  // ---------------------------------------------------------------
+  // Employee Cubit
+  // ---------------------------------------------------------------
+
+  sl.registerFactory(
+        () => EmployeeCubit(
+      getEmployees: sl(),
+      getById: sl(),
+      createEmployee: sl(),
+      updateEmployee: sl(),
+      deleteEmployee: sl(),
+    ),
+  );
 }

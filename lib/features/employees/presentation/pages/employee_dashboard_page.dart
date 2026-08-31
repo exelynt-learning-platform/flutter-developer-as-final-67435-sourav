@@ -86,16 +86,8 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                         crossAxisAlignment:
                         CrossAxisAlignment.start,
                         children: [
-                          if (widget.user.photoUrl != null)
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundImage: NetworkImage(
-                                widget.user.photoUrl!,
-                              ),
-                            ),
-
+                          _userAvatar(radius: 22),
                           const SizedBox(height: 8),
-
                           Text(
                             widget.user.name.isEmpty
                                 ? 'User'
@@ -131,22 +123,7 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                     ),
                   ];
                 },
-
-                child: CircleAvatar(
-                  backgroundImage:
-                  widget.user.photoUrl != null
-                      ? NetworkImage(widget.user.photoUrl!)
-                      : null,
-
-                  child: widget.user.photoUrl == null
-                      ? Text(
-                    widget.user.name.isEmpty
-                        ? 'U'
-                        : widget.user.name[0]
-                        .toUpperCase(),
-                  )
-                      : null,
-                ),
+                child: _userAvatar(radius: 20),
               ),
             ),
           ],
@@ -948,5 +925,27 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
           ),
         ),
       );
+  }
+
+  Widget _userAvatar({
+    double radius = 20,
+  }) {
+    final photoUrl = widget.user.photoUrl?.trim();
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: NetworkImage(photoUrl),
+      );
+    }
+
+    final name = widget.user.name.trim();
+
+    return CircleAvatar(
+      radius: radius,
+      child: Text(
+        name.isEmpty ? 'U' : name[0].toUpperCase(),
+      ),
+    );
   }
 }

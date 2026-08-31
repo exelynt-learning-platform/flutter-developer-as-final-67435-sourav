@@ -14,6 +14,9 @@ class AuthLoading extends AuthState {}
 class Authenticated extends AuthState { final AppUser user; const Authenticated(this.user); @override List<Object?> get props => [user]; }
 class Unauthenticated extends AuthState {}
 class AuthFailure extends AuthState { final String message; const AuthFailure(this.message); @override List<Object?> get props => [message]; }
+class PasswordResetSuccess extends AuthState {
+  const PasswordResetSuccess();
+}
 
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository repository;
@@ -22,30 +25,182 @@ class AuthCubit extends Cubit<AuthState> {
   final GoogleSignInUseCase googleUseCase;
   final ResetPasswordUseCase resetUseCase;
   final SignOutUseCase signOutUseCase;
+
   StreamSubscription<AppUser?>? _subscription;
 
-  AuthCubit({required this.repository, required this.signInUseCase, required this.registerUseCase, required this.googleUseCase, required this.resetUseCase, required this.signOutUseCase}) : super(AuthInitial()) {
-    _subscription = repository.authStateChanges().listen((user) {
-      if (user == null) { emit(Unauthenticated()); } else { emit(Authenticated(user)); }
-    });
+  AuthCubit({
+    required this.repository,
+    required this.signInUseCase,
+    required this.registerUseCase,
+    required this.googleUseCase,
+    required this.resetUseCase,
+    required this.signOutUseCase,
+  }) : super(AuthInitial()) {
+    _subscription = repository.authStateChanges().listen(
+          (user) {
+        if (user == null) {
+          emit(Unauthenticated());
+        } else {
+          emit(Authenticated(user));
+        }
+      },
+      onError: (error) {
+        emit(
+          AuthFailure(
+            'Unable to check authentication status.',
+          ),
+        );
+      },
+    );
   }
 
-  Future<void> signIn(String email, String password) async {
-    emit(AuthLoading()); final result = await signInUseCase(email, password);
-    if (result.isSuccess) emit(Authenticated(result.user!)); else emit(AuthFailure(result.failure!.message));
+  // ===============================================================
+  // SIGN IN
+  // ===============================================================
+
+  Future<void> signIn(
+      String email,
+      String password,
+      ) async {
+    emit(AuthLoading());
+
+    final result = await signInUseCase(
+      email,
+      password,
+    );
+
+    if (result.isSuccess && result.user != null) {
+      emit(
+        Authenticated(result.user!),
+      );
+    } else {
+      emit(
+        AuthFailure(
+          result.failure?.message ??
+              'Unable to sign in.',
+        ),
+      );
+    }
   }
-  Future<void> register(String name, String email, String password) async {
-    emit(AuthLoading()); final result = await registerUseCase(name, email, password);
-    if (result.isSuccess) emit(Authenticated(result.user!)); else emit(AuthFailure(result.failure!.message));
+
+  // ===============================================================
+  // REGISTER
+  // ===============================================================
+
+  Future<void> register(
+      String name,
+      String email,
+      String password,
+      ) async {
+    emit(AuthLoading());
+
+    final result = await registerUseCase(
+      name,
+      email,
+      password,
+    );
+
+    if (result.isSuccess && result.user != null) {
+      emit(
+        Authenticated(result.user!),
+      );
+    } else {
+      emit(
+        AuthFailure(
+          result.failure?.message ??
+              'Unable to create account.',
+        ),
+      );
+    }
   }
+
+  // ===============================================================
+  // GOOGLE SIGN IN
+  // ===============================================================
+
   Future<void> google() async {
-    emit(AuthLoading()); final result = await googleUseCase();
-    if (result.isSuccess) emit(Authenticated(result.user!)); else emit(AuthFailure(result.failure!.message));
+    emit(AuthLoading());
+
+    final result = await googleUseCase();
+
+    if (result.isSuccess && result.user != null) {
+      emit(
+        Authenticated(result.user!),
+      );
+    } else {
+      emit(
+        AuthFailure(
+          result.failure?.message ??
+              'Unable to sign in with Google.',
+        ),
+      );
+    }
   }
-  Future<String?> resetPassword(String email) async {
-    emit(AuthLoading()); final failure = await resetUseCase(email);
-    emit(Unauthenticated()); return failure?.message;
+
+  // ===============================================================
+  // RESET PASSWORD
+  // ===============================================================
+
+  Future<String?> resetPassword(
+      String email,
+      ) async {
+    emit(AuthLoading());
+
+    final failure = await resetUseCase(
+      email.trim(),
+    );
+
+    if (failure != null) {
+      emit(
+        AuthFailure(
+          failure.message,
+        ),
+      );
+
+      return failure.message;
+    }
+
+    // Password reset succeeded.
+    // Do not change the authentication state.
+    emit(
+      const PasswordResetSuccess(),
+    );
+
+    return null;
   }
-  Future<void> logout() async { emit(AuthLoading()); final failure = await signOutUseCase(); if (failure != null) emit(AuthFailure(failure.message)); }
-  @override Future<void> close() { _subscription?.cancel(); return super.close(); }
+
+  // ===============================================================
+  // LOGOUT
+  // ===============================================================
+
+  Future<void> logout() async {
+    emit(AuthLoading());
+
+    final failure = await signOutUseCase();
+
+    if (failure != null) {
+      emit(
+        AuthFailure(
+          failure.message,
+        ),
+      );
+
+      return;
+    }
+
+    // Firebase authStateChanges() will normally
+    // emit null and transition the application to
+    // Unauthenticated.
+  }
+
+  // ===============================================================
+  // CLOSE
+  // ===============================================================
+
+  @override
+  Future<void> close() async {
+    await _subscription?.cancel();
+
+    return super.close();
+  }
 }
