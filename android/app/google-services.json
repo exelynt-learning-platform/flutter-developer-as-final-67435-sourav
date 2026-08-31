@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "267983299067",
+    "project_id": "emp-management-project",
+    "storage_bucket": "emp-management-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:267983299067:android:a7599bd4640a98dad72b5e",
+        "android_client_info": {
+          "package_name": "com.example.employee_management_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3NBSTsRs5hMRGEHBZbpt48sZ1_f3T2Ko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
