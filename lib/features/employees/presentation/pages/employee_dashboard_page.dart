@@ -182,9 +182,7 @@ class _EmployeeDashboardPageState
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const EmployeeFormPage(
-          readOnly: false,
-        ),
+        builder: (_) => const EmployeeFormPage(),
       ),
     );
 
@@ -211,7 +209,6 @@ class _EmployeeDashboardPageState
       MaterialPageRoute(
         builder: (_) => EmployeeFormPage(
           employee: employee,
-          readOnly: false,
         ),
       ),
     );

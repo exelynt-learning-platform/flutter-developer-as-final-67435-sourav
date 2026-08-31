@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../../injection_container.dart';
 import '../../domain/entities/employee.dart';
 import '../bloc/country_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/employee_cubit.dart';
 
 class EmployeeFormPage extends StatefulWidget {
   final Employee? employee;
@@ -19,15 +22,10 @@ class EmployeeFormPage extends StatefulWidget {
 }
 
 class _EmployeeFormPageState extends State<EmployeeFormPage> {
-  // -------------------------------------------------------------
-  // Form
-  // -------------------------------------------------------------
+  late final EmployeeCubit _employeeCubit;
+  late final CountryCubit _countryCubit;
 
   final _formKey = GlobalKey<FormState>();
-
-  // -------------------------------------------------------------
-  // Controllers
-  // -------------------------------------------------------------
 
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
@@ -36,9 +34,18 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
   late final TextEditingController _stateController;
   late final TextEditingController _districtController;
 
+  bool _saving = false;
+
+  bool get _isEdit => widget.employee != null;
+
   @override
   void initState() {
     super.initState();
+
+    _employeeCubit = sl<EmployeeCubit>();
+
+    _countryCubit =
+        widget.providedCountryCubit ?? sl<CountryCubit>();
 
     final employee = widget.employee;
 
@@ -65,6 +72,16 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
     _districtController = TextEditingController(
       text: employee?.district ?? '',
     );
+
+    _loadCountries();
+  }
+
+  Future<void> _loadCountries() async {
+    try {
+      await _countryCubit.load();
+    } catch (_) {
+      // Country loading errors are handled by CountryCubit.
+    }
   }
 
   @override
@@ -76,160 +93,243 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
     _stateController.dispose();
     _districtController.dispose();
 
+    if (widget.providedCountryCubit == null) {
+      _countryCubit.close();
+    }
+
+    _employeeCubit.close();
+
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.readOnly
-              ? 'Employee Details'
-              : widget.employee == null
-              ? 'Add Employee'
-              : 'Edit Employee',
+    final readOnly = widget.readOnly;
+
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<EmployeeCubit>.value(
+          value: _employeeCubit,
         ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _nameController,
-              enabled: !widget.readOnly,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Name is required';
-                }
+        BlocProvider<CountryCubit>.value(
+          value: _countryCubit,
+        ),
+      ],
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            readOnly
+                ? 'Employee Details'
+                : _isEdit
+                ? 'Edit Employee'
+                : 'Add Employee',
+          ),
+        ),
+        body: SafeArea(
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 700,
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.stretch,
+                    children: [
+                      _buildTextField(
+                        controller: _nameController,
+                        label: 'Name',
+                        icon: Icons.person_outline,
+                        enabled: !readOnly,
+                        validator: _validateName,
+                      ),
 
-                return null;
-              },
-            ),
+                      const SizedBox(height: 16),
 
-            const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _emailController,
+                        label: 'Email',
+                        icon: Icons.email_outlined,
+                        keyboardType:
+                        TextInputType.emailAddress,
+                        enabled: !readOnly,
+                        validator: _validateEmail,
+                      ),
 
-            TextFormField(
-              controller: _emailController,
-              enabled: !widget.readOnly,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-              ),
-              validator: (value) {
-                final email = value?.trim() ?? '';
+                      const SizedBox(height: 16),
 
-                if (email.isEmpty) {
-                  return 'Email is required';
-                }
+                      _buildTextField(
+                        controller: _mobileController,
+                        label: 'Mobile',
+                        icon: Icons.phone_outlined,
+                        keyboardType:
+                        TextInputType.phone,
+                        enabled: !readOnly,
+                        validator: _validateMobile,
+                      ),
 
-                final emailRegex = RegExp(
-                  r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                );
+                      const SizedBox(height: 16),
 
-                if (!emailRegex.hasMatch(email)) {
-                  return 'Please enter a valid email';
-                }
+                      _buildTextField(
+                        controller: _countryController,
+                        label: 'Country',
+                        icon: Icons.public,
+                        enabled: !readOnly,
+                        validator: _validateRequired,
+                      ),
 
-                return null;
-              },
-            ),
+                      const SizedBox(height: 16),
 
-            const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _stateController,
+                        label: 'State',
+                        icon: Icons.location_city_outlined,
+                        enabled: !readOnly,
+                        validator: _validateRequired,
+                      ),
 
-            TextFormField(
-              controller: _mobileController,
-              enabled: !widget.readOnly,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Mobile',
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Mobile is required';
-                }
+                      const SizedBox(height: 16),
 
-                return null;
-              },
-            ),
+                      _buildTextField(
+                        controller: _districtController,
+                        label: 'District',
+                        icon: Icons.location_on_outlined,
+                        enabled: !readOnly,
+                        validator: _validateRequired,
+                      ),
 
-            const SizedBox(height: 16),
+                      if (!readOnly) ...[
+                        const SizedBox(height: 28),
 
-            TextFormField(
-              controller: _countryController,
-              enabled: !widget.readOnly,
-              decoration: const InputDecoration(
-                labelText: 'Country',
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Country is required';
-                }
-
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _stateController,
-              enabled: !widget.readOnly,
-              decoration: const InputDecoration(
-                labelText: 'State',
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'State is required';
-                }
-
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _districtController,
-              enabled: !widget.readOnly,
-              decoration: const InputDecoration(
-                labelText: 'District',
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'District is required';
-                }
-
-                return null;
-              },
-            ),
-
-            if (!widget.readOnly) ...[
-              const SizedBox(height: 24),
-
-              FilledButton(
-                onPressed: _saveEmployee,
-                child: Text(
-                  widget.employee == null
-                      ? 'Create Employee'
-                      : 'Update Employee',
+                        BlocBuilder<EmployeeCubit,
+                            EmployeeState>(
+                          bloc: _employeeCubit,
+                          builder: (context, state) {
+                            return SizedBox(
+                              height: 50,
+                              child: FilledButton.icon(
+                                onPressed:
+                                _saving ? null : _saveEmployee,
+                                icon: _saving
+                                    ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child:
+                                  CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                    : const Icon(Icons.save),
+                                label: Text(
+                                  _saving
+                                      ? 'Saving...'
+                                      : _isEdit
+                                      ? 'Update Employee'
+                                      : 'Save Employee',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required bool enabled,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      validator: validator,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  String? _validateRequired(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'This field is required';
+    }
+
+    return null;
+  }
+
+  String? _validateName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Name is required';
+    }
+
+    if (value.trim().length < 2) {
+      return 'Name must contain at least 2 characters';
+    }
+
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+
+    if (email.isEmpty) {
+      return 'Email is required';
+    }
+
+    final emailRegex = RegExp(
+      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+    );
+
+    if (!emailRegex.hasMatch(email)) {
+      return 'Please enter a valid email';
+    }
+
+    return null;
+  }
+
+  String? _validateMobile(String? value) {
+    final mobile = value?.trim() ?? '';
+
+    if (mobile.isEmpty) {
+      return 'Mobile number is required';
+    }
+
+    if (!RegExp(r'^[0-9]{10}$').hasMatch(mobile)) {
+      return 'Enter a valid 10 digit mobile number';
+    }
+
+    return null;
+  }
+
   Future<void> _saveEmployee() async {
+    if (_saving) return;
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    setState(() {
+      _saving = true;
+    });
 
     final employee = Employee(
       id: widget.employee?.id ?? '',
@@ -241,6 +341,40 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
       district: _districtController.text.trim(),
     );
 
-    // Keep your existing save logic here.
+    try {
+      final saved = await _employeeCubit.save(employee);
+
+      if (!mounted) return;
+
+      setState(() {
+        _saving = false;
+      });
+
+      if (saved != null) {
+        Navigator.pop(context, saved);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to save employee. Please try again.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _saving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to save employee: $e',
+          ),
+        ),
+      );
+    }
   }
 }
