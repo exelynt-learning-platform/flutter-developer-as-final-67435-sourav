@@ -12,10 +12,15 @@ import 'features/employees/presentation/pages/employee_dashboard_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   await Hive.initFlutter();
-  SharedPreferences.getInstance();
-  try { await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); } catch (_) {}
+
   await configureDependencies();
+
   runApp(const EmployeeManagementApp());
 }
 

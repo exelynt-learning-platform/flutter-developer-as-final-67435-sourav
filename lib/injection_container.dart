@@ -11,6 +11,7 @@ import 'features/auth/data/repositories/unavailable_auth_repository.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/auth_usecases.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/employees/data/datasources/employee_local_data_source.dart';
 import 'features/employees/data/datasources/employee_remote_data_source.dart';
 import 'features/employees/data/datasources/country_remote_data_source.dart';
 import 'features/employees/data/repositories/country_repository_impl.dart';
@@ -36,6 +37,10 @@ Future<void> configureDependencies() async {
 
   sl.registerLazySingleton<SharedPreferences>(
         () => prefs,
+  );
+
+  sl.registerLazySingleton<EmployeeLocalDataSource>(
+        () => EmployeeLocalDataSource(box),
   );
 
   // ---------------------------------------------------------------
@@ -122,17 +127,25 @@ Future<void> configureDependencies() async {
         () => EmployeeRemoteDataSource(sl()),
   );
 
+  // ---------------------------------------------------------------
+  // Country Remote Data Source
+  // ---------------------------------------------------------------
+
   sl.registerLazySingleton<CountryRemoteDataSource>(
         () => CountryRemoteDataSource(sl()),
   );
 
   // ---------------------------------------------------------------
-  // Country
+  // Country Repository
   // ---------------------------------------------------------------
 
   sl.registerLazySingleton<CountryRepository>(
         () => CountryRepositoryImpl(sl()),
   );
+
+  // ---------------------------------------------------------------
+  // Country Cubit
+  // ---------------------------------------------------------------
 
   sl.registerFactory(
         () => CountryCubit(sl()),
@@ -144,8 +157,8 @@ Future<void> configureDependencies() async {
 
   sl.registerLazySingleton<EmployeeRepository>(
         () => EmployeeRepositoryImpl(
-      remote: sl(),
-      cache: box,
+      remote: sl<EmployeeRemoteDataSource>(),
+      local: sl<EmployeeLocalDataSource>(),
     ),
   );
 
