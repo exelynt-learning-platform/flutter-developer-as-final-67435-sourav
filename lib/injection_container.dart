@@ -25,178 +25,234 @@ import 'features/employees/presentation/bloc/employee_cubit.dart';
 final sl = GetIt.instance;
 
 Future<void> configureDependencies() async {
-  // ---------------------------------------------------------------
-  // Local persistence
-  // ---------------------------------------------------------------
+  // ===============================================================
+  // Hive initialization
+  // ===============================================================
+
+  await Hive.initFlutter();
 
   final box = await Hive.openBox<String>(
     'employee_cache',
   );
 
+  // ===============================================================
+  // Shared Preferences
+  // ===============================================================
+
   final prefs = await SharedPreferences.getInstance();
 
-  sl.registerLazySingleton<SharedPreferences>(
-        () => prefs,
-  );
-
-  sl.registerLazySingleton<EmployeeLocalDataSource>(
-        () => EmployeeLocalDataSource(box),
-  );
-
-  // ---------------------------------------------------------------
-  // Network
-  // ---------------------------------------------------------------
-
-  sl.registerLazySingleton<Dio>(
-        () => DioClient().dio,
-  );
-
-  // ---------------------------------------------------------------
-  // Firebase Authentication
-  // ---------------------------------------------------------------
-
-  final firebaseReady = Firebase.apps.isNotEmpty;
-
-  if (firebaseReady) {
-    sl.registerLazySingleton<FirebaseAuth>(
-          () => FirebaseAuth.instance,
-    );
-
-    sl.registerLazySingleton<GoogleSignIn>(
-          () => GoogleSignIn(
-        scopes: ['email'],
-      ),
-    );
-
-    sl.registerLazySingleton<AuthRepository>(
-          () => FirebaseAuthRepository(
-        auth: sl<FirebaseAuth>(),
-        googleSignIn: sl<GoogleSignIn>(),
-      ),
-    );
-  } else {
-    sl.registerLazySingleton<AuthRepository>(
-          () => const UnavailableAuthRepository(),
+  if (!sl.isRegistered<SharedPreferences>()) {
+    sl.registerLazySingleton<SharedPreferences>(
+          () => prefs,
     );
   }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
+  // Network
+  // ===============================================================
+
+  if (!sl.isRegistered<Dio>()) {
+    sl.registerLazySingleton<Dio>(
+          () => DioClient().dio,
+    );
+  }
+
+  // ===============================================================
+  // Firebase Authentication
+  // ===============================================================
+
+  final firebaseReady = Firebase.apps.isNotEmpty;
+
+  if (!sl.isRegistered<AuthRepository>()) {
+    if (firebaseReady) {
+      if (!sl.isRegistered<FirebaseAuth>()) {
+        sl.registerLazySingleton<FirebaseAuth>(
+              () => FirebaseAuth.instance,
+        );
+      }
+
+      if (!sl.isRegistered<GoogleSignIn>()) {
+        sl.registerLazySingleton<GoogleSignIn>(
+              () => GoogleSignIn(
+            scopes: ['email'],
+          ),
+        );
+      }
+
+      sl.registerLazySingleton<AuthRepository>(
+            () => FirebaseAuthRepository(
+          auth: sl<FirebaseAuth>(),
+          googleSignIn: sl<GoogleSignIn>(),
+        ),
+      );
+    } else {
+      sl.registerLazySingleton<AuthRepository>(
+            () => const UnavailableAuthRepository(),
+      );
+    }
+  }
+
+  // ===============================================================
   // Authentication Use Cases
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerLazySingleton(
-        () => SignInUseCase(sl()),
-  );
+  if (!sl.isRegistered<SignInUseCase>()) {
+    sl.registerLazySingleton(
+          () => SignInUseCase(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => RegisterUseCase(sl()),
-  );
+  if (!sl.isRegistered<RegisterUseCase>()) {
+    sl.registerLazySingleton(
+          () => RegisterUseCase(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => GoogleSignInUseCase(sl()),
-  );
+  if (!sl.isRegistered<GoogleSignInUseCase>()) {
+    sl.registerLazySingleton(
+          () => GoogleSignInUseCase(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => ResetPasswordUseCase(sl()),
-  );
+  if (!sl.isRegistered<ResetPasswordUseCase>()) {
+    sl.registerLazySingleton(
+          () => ResetPasswordUseCase(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => SignOutUseCase(sl()),
-  );
+  if (!sl.isRegistered<SignOutUseCase>()) {
+    sl.registerLazySingleton(
+          () => SignOutUseCase(sl()),
+    );
+  }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
   // Authentication Cubit
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerFactory(
-        () => AuthCubit(
-      repository: sl(),
-      signInUseCase: sl(),
-      registerUseCase: sl(),
-      googleUseCase: sl(),
-      resetUseCase: sl(),
-      signOutUseCase: sl(),
-    ),
-  );
+  if (!sl.isRegistered<AuthCubit>()) {
+    sl.registerFactory(
+          () => AuthCubit(
+        repository: sl(),
+        signInUseCase: sl(),
+        registerUseCase: sl(),
+        googleUseCase: sl(),
+        resetUseCase: sl(),
+        signOutUseCase: sl(),
+      ),
+    );
+  }
 
-  // ---------------------------------------------------------------
-  // Employee Remote Data Sources
-  // ---------------------------------------------------------------
+  // ===============================================================
+  // Employee Remote Data Source
+  // ===============================================================
 
-  sl.registerLazySingleton<EmployeeRemoteDataSource>(
-        () => EmployeeRemoteDataSource(sl()),
-  );
+  if (!sl.isRegistered<EmployeeRemoteDataSource>()) {
+    sl.registerLazySingleton<EmployeeRemoteDataSource>(
+          () => EmployeeRemoteDataSource(sl()),
+    );
+  }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
   // Country Remote Data Source
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerLazySingleton<CountryRemoteDataSource>(
-        () => CountryRemoteDataSource(sl()),
-  );
+  if (!sl.isRegistered<CountryRemoteDataSource>()) {
+    sl.registerLazySingleton<CountryRemoteDataSource>(
+          () => CountryRemoteDataSource(sl()),
+    );
+  }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
   // Country Repository
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerLazySingleton<CountryRepository>(
-        () => CountryRepositoryImpl(sl()),
-  );
+  if (!sl.isRegistered<CountryRepository>()) {
+    sl.registerLazySingleton<CountryRepository>(
+          () => CountryRepositoryImpl(sl()),
+    );
+  }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
   // Country Cubit
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerFactory(
-        () => CountryCubit(sl()),
-  );
+  if (!sl.isRegistered<CountryCubit>()) {
+    sl.registerFactory(
+          () => CountryCubit(sl()),
+    );
+  }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
+  // Employee Local Data Source
+  // ===============================================================
+
+  if (!sl.isRegistered<EmployeeLocalDataSource>()) {
+    sl.registerLazySingleton<EmployeeLocalDataSource>(
+          () => EmployeeLocalDataSource(box),
+    );
+  }
+
+  // ===============================================================
   // Employee Repository
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerLazySingleton<EmployeeRepository>(
-        () => EmployeeRepositoryImpl(
-      remote: sl<EmployeeRemoteDataSource>(),
-      local: sl<EmployeeLocalDataSource>(),
-    ),
-  );
+  if (!sl.isRegistered<EmployeeRepository>()) {
+    sl.registerLazySingleton<EmployeeRepository>(
+          () => EmployeeRepositoryImpl(
+        remote: sl(),
+        local: sl(),
+      ),
+    );
+  }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
   // Employee Use Cases
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerLazySingleton(
-        () => GetEmployees(sl()),
-  );
+  if (!sl.isRegistered<GetEmployees>()) {
+    sl.registerLazySingleton(
+          () => GetEmployees(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => GetEmployeeById(sl()),
-  );
+  if (!sl.isRegistered<GetEmployeeById>()) {
+    sl.registerLazySingleton(
+          () => GetEmployeeById(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => CreateEmployee(sl()),
-  );
+  if (!sl.isRegistered<CreateEmployee>()) {
+    sl.registerLazySingleton(
+          () => CreateEmployee(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => UpdateEmployee(sl()),
-  );
+  if (!sl.isRegistered<UpdateEmployee>()) {
+    sl.registerLazySingleton(
+          () => UpdateEmployee(sl()),
+    );
+  }
 
-  sl.registerLazySingleton(
-        () => DeleteEmployee(sl()),
-  );
+  if (!sl.isRegistered<DeleteEmployee>()) {
+    sl.registerLazySingleton(
+          () => DeleteEmployee(sl()),
+    );
+  }
 
-  // ---------------------------------------------------------------
+  // ===============================================================
   // Employee Cubit
-  // ---------------------------------------------------------------
+  // ===============================================================
 
-  sl.registerFactory(
-        () => EmployeeCubit(
-      getEmployees: sl(),
-      getById: sl(),
-      createEmployee: sl(),
-      updateEmployee: sl(),
-      deleteEmployee: sl(),
-    ),
-  );
+  if (!sl.isRegistered<EmployeeCubit>()) {
+    sl.registerFactory(
+          () => EmployeeCubit(
+        getEmployees: sl(),
+        getById: sl(),
+        createEmployee: sl(),
+        updateEmployee: sl(),
+        deleteEmployee: sl(),
+      ),
+    );
+  }
 }

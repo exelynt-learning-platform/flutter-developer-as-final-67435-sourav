@@ -13,15 +13,21 @@ import 'features/employees/presentation/pages/employee_dashboard_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  await Hive.initFlutter();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Firebase is unavailable.
+    // configureDependencies() will use
+    // UnavailableAuthRepository as fallback.
+  }
 
   await configureDependencies();
 
-  runApp(const EmployeeManagementApp());
+  runApp(
+    const EmployeeManagementApp(),
+  );
 }
 
 class EmployeeManagementApp extends StatefulWidget {
