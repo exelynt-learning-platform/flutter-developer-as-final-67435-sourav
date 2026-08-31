@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/domain/entities/app_user.dart';
-import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/employee.dart';
 import '../bloc/employee_cubit.dart';
-import '../widgets/employee_card.dart';
+import '../widgets/employee_state_widgets.dart';
 import 'employee_form_page.dart';
 
 class EmployeeDashboardPage extends StatefulWidget {
@@ -79,90 +78,29 @@ class _EmployeeDashboardPageState
 
   Widget _buildEmployeeContent() {
     return BlocBuilder<EmployeeCubit, EmployeeState>(
-      bloc: cubit,
       builder: (context, state) {
-        // Loading
-        if (state is EmployeeLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
+        if (state.status == EmployeeStatus.loading) {
+          return const EmployeeLoadingState();
+        }
+
+        if (state.status == EmployeeStatus.error) {
+          return EmployeeErrorState(
+            message: state.errorMessage ?? 'Something Went Wrong',
+            onRetry: cubit.load,
           );
         }
 
-        // Error
-        if (state is EmployeeError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 56,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Something went wrong',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    state.message,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    onPressed: cubit.load,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+        if (state.status == EmployeeStatus.success) {
+          final employees = state.visible;
 
-        // Empty
-        if (state is EmployeeEmpty) {
-          return RefreshIndicator(
-            onRefresh: cubit.load,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: const [
-                SizedBox(height: 120),
-                Icon(
-                  Icons.people_outline,
-                  size: 64,
-                ),
-                SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    'No employees found',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    'There are no employees available.',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+          if (employees.isEmpty) {
+            return const EmployeeEmptyState(
+              message: 'No employees match your search.',
+            );
+          }
 
-        // Loaded
-        if (state is EmployeeLoaded) {
           return EmployeeGrid(
-            employees: _filteredEmployees(state),
+            employees: employees,
             onView: _viewEmployee,
             onEdit: _editEmployee,
             onDelete: _deleteEmployee,
@@ -175,53 +113,53 @@ class _EmployeeDashboardPageState
     );
   }
 
-  List<Employee> _filteredEmployees(
-      EmployeeLoaded state,
-      ) {
-    var employees = state.employees;
-
-    if (state.searchId.trim().isNotEmpty) {
-      employees = employees
-          .where(
-            (employee) =>
-        employee.id == state.searchId.trim(),
-      )
-          .toList();
-    }
-
-    if (state.filterText.trim().isNotEmpty) {
-      final text = state.filterText.trim().toLowerCase();
-
-      employees = employees.where((employee) {
-        switch (state.filter) {
-          case 'Name':
-            return employee.name
-                .toLowerCase()
-                .contains(text);
-
-          case 'Email':
-            return employee.email
-                .toLowerCase()
-                .contains(text);
-
-          case 'Mobile':
-            return employee.mobile
-                .toLowerCase()
-                .contains(text);
-
-          case 'Country':
-            return employee.country
-                .toLowerCase()
-                .contains(text);
-
-          default:
-            return true;
-        }
-      }).toList();
-    }
-
-    return employees;
-  }
+  // List<Employee> _filteredEmployees(
+  //     EmployeeLoaded state,
+  //     ) {
+  //   var employees = state.employees;
+  //
+  //   if (state.searchId.trim().isNotEmpty) {
+  //     employees = employees
+  //         .where(
+  //           (employee) =>
+  //       employee.id == state.searchId.trim(),
+  //     )
+  //         .toList();
+  //   }
+  //
+  //   if (state.filterText.trim().isNotEmpty) {
+  //     final text = state.filterText.trim().toLowerCase();
+  //
+  //     employees = employees.where((employee) {
+  //       switch (state.filter) {
+  //         case 'Name':
+  //           return employee.name
+  //               .toLowerCase()
+  //               .contains(text);
+  //
+  //         case 'Email':
+  //           return employee.email
+  //               .toLowerCase()
+  //               .contains(text);
+  //
+  //         case 'Mobile':
+  //           return employee.mobile
+  //               .toLowerCase()
+  //               .contains(text);
+  //
+  //         case 'Country':
+  //           return employee.country
+  //               .toLowerCase()
+  //               .contains(text);
+  //
+  //         default:
+  //           return true;
+  //       }
+  //     }).toList();
+  //   }
+  //
+  //   return employees;
+  // }
 
   PreferredSizeWidget _buildAppBar(
       BuildContext context,
@@ -240,13 +178,13 @@ class _EmployeeDashboardPageState
     );
   }
 
-  Future<void> _openEmployeeForm(
-      BuildContext context,
-      ) async {
+  Future<void> _openEmployeeForm(BuildContext context) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const EmployeeFormPage(),
+        builder: (_) => const EmployeeFormPage(
+          readOnly: false,
+        ),
       ),
     );
 
@@ -255,27 +193,25 @@ class _EmployeeDashboardPageState
     await cubit.load();
   }
 
-  Future<void> _viewEmployee(
-      Employee employee,
-      ) async {
+  Future<void> _viewEmployee(Employee employee) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EmployeeFormPage(
           employee: employee,
+          readOnly: true,
         ),
       ),
     );
   }
 
-  Future<void> _editEmployee(
-      Employee employee,
-      ) async {
+  Future<void> _editEmployee(Employee employee) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EmployeeFormPage(
           employee: employee,
+          readOnly: false,
         ),
       ),
     );
@@ -332,32 +268,8 @@ class EmployeeGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (employees.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.people_outline,
-                size: 64,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'No employees found',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'No employees match your search or filter.',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
+      return const EmployeeEmptyState(
+        message: 'No employees match your search.',
       );
     }
 
@@ -365,7 +277,7 @@ class EmployeeGrid extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
 
-        int columns;
+        final int columns;
 
         if (width >= 1200) {
           columns = 4;
@@ -382,13 +294,11 @@ class EmployeeGrid extends StatelessWidget {
           child: GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
-            gridDelegate:
-            SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: columns,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio:
-              columns == 1 ? 1.7 : 1.35,
+              childAspectRatio: columns == 1 ? 1.7 : 1.35,
             ),
             itemCount: employees.length,
             itemBuilder: (context, index) {

@@ -16,6 +16,50 @@ void main(){
   late EmployeeCubit cubit;
   setUp(() { final r=FakeRepository(); cubit=EmployeeCubit(getEmployees:GetEmployees(r),getById:GetEmployeeById(r),createEmployee:CreateEmployee(r),updateEmployee:UpdateEmployee(r),deleteEmployee:DeleteEmployee(r)); });
   tearDown(()=>cubit.close());
-  test('loads and filters employees',() async { await cubit.load(); expect(cubit.state, isA<EmployeeLoaded>()); cubit.filter('Name','alice'); final s=cubit.state as EmployeeLoaded; expect(s.visible.length,1); expect(s.visible.first.name,'Alice'); });
-  test('searches by employee id',() async { await cubit.load(); cubit.searchId('2'); expect((cubit.state as EmployeeLoaded).visible.single.name,'Bob'); });
+  test('loads and filters employees', () async {
+    await cubit.load();
+
+    expect(
+      cubit.state.status,
+      EmployeeStatus.success,
+    );
+
+    expect(
+      cubit.state.employees.length,
+      2,
+    );
+
+    cubit.filter('Name', 'alice');
+
+    expect(
+      cubit.state.visible.length,
+      1,
+    );
+
+    expect(
+      cubit.state.visible.first.name,
+      'Alice',
+    );
+  });
+
+  test('searches by employee id', () async {
+    await cubit.load();
+
+    expect(
+      cubit.state.status,
+      EmployeeStatus.success,
+    );
+
+    cubit.searchId('2');
+
+    expect(
+      cubit.state.visible.length,
+      1,
+    );
+
+    expect(
+      cubit.state.visible.first.name,
+      'Bob',
+    );
+  });
 }

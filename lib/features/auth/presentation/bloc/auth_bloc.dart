@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/errors/app_failure.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/auth_usecases.dart';
@@ -18,8 +19,13 @@ class PasswordResetSuccess extends AuthState {
   const PasswordResetSuccess();
 }
 
+// ============================================================================
+// AUTH CUBIT
+// ============================================================================
+
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository repository;
+
   final SignInUseCase signInUseCase;
   final RegisterUseCase registerUseCase;
   final GoogleSignInUseCase googleUseCase;
@@ -35,18 +41,36 @@ class AuthCubit extends Cubit<AuthState> {
     required this.googleUseCase,
     required this.resetUseCase,
     required this.signOutUseCase,
-  }) : super(AuthInitial()) {
+  }) : super( AuthInitial()) {
+    _listenToAuthState();
+  }
+
+  // ==========================================================================
+  // AUTH STATE LISTENER
+  // ==========================================================================
+
+  void _listenToAuthState() {
     _subscription = repository.authStateChanges().listen(
           (user) {
+        if (isClosed) {
+          return;
+        }
+
         if (user == null) {
           emit(Unauthenticated());
         } else {
-          emit(Authenticated(user));
+          emit(
+            Authenticated(user),
+          );
         }
       },
-      onError: (error) {
+      onError: (_) {
+        if (isClosed) {
+          return;
+        }
+
         emit(
-          AuthFailure(
+          const AuthFailure(
             'Unable to check authentication status.',
           ),
         );
@@ -54,9 +78,9 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
-  // ===============================================================
+  // ==========================================================================
   // SIGN IN
-  // ===============================================================
+  // ==========================================================================
 
   Future<void> signIn(
       String email,
@@ -64,28 +88,44 @@ class AuthCubit extends Cubit<AuthState> {
       ) async {
     emit(AuthLoading());
 
-    final result = await signInUseCase(
-      email,
-      password,
-    );
-
-    if (result.isSuccess && result.user != null) {
-      emit(
-        Authenticated(result.user!),
+    try {
+      final result = await signInUseCase(
+        email.trim(),
+        password,
       );
-    } else {
+
+      if (result.isSuccess && result.user != null) {
+        emit(
+          Authenticated(result.user!),
+        );
+
+        return;
+      }
+
       emit(
         AuthFailure(
           result.failure?.message ??
               'Unable to sign in.',
         ),
       );
+    } on AppFailure catch (failure) {
+      emit(
+        AuthFailure(
+          failure.message,
+        ),
+      );
+    } catch (_) {
+      emit(
+        const AuthFailure(
+          'Unable to sign in. Please try again.',
+        ),
+      );
     }
   }
 
-  // ===============================================================
+  // ==========================================================================
   // REGISTER
-  // ===============================================================
+  // ==========================================================================
 
   Future<void> register(
       String name,
@@ -94,63 +134,112 @@ class AuthCubit extends Cubit<AuthState> {
       ) async {
     emit(AuthLoading());
 
-    final result = await registerUseCase(
-      name,
-      email,
-      password,
-    );
-
-    if (result.isSuccess && result.user != null) {
-      emit(
-        Authenticated(result.user!),
+    try {
+      final result = await registerUseCase(
+        name.trim(),
+        email.trim(),
+        password,
       );
-    } else {
+
+      if (result.isSuccess && result.user != null) {
+        emit(
+          Authenticated(result.user!),
+        );
+
+        return;
+      }
+
       emit(
         AuthFailure(
           result.failure?.message ??
               'Unable to create account.',
         ),
       );
+    } on AppFailure catch (failure) {
+      emit(
+        AuthFailure(
+          failure.message,
+        ),
+      );
+    } catch (_) {
+      emit(
+        const AuthFailure(
+          'Unable to create account. Please try again.',
+        ),
+      );
     }
   }
 
-  // ===============================================================
+  // ==========================================================================
   // GOOGLE SIGN IN
-  // ===============================================================
+  // ==========================================================================
 
   Future<void> google() async {
     emit(AuthLoading());
 
-    final result = await googleUseCase();
+    try {
+      final result = await googleUseCase();
 
-    if (result.isSuccess && result.user != null) {
-      emit(
-        Authenticated(result.user!),
-      );
-    } else {
+      if (result.isSuccess && result.user != null) {
+        emit(
+          Authenticated(result.user!),
+        );
+
+        return;
+      }
+
       emit(
         AuthFailure(
           result.failure?.message ??
               'Unable to sign in with Google.',
         ),
       );
+    } on AppFailure catch (failure) {
+      emit(
+        AuthFailure(
+          failure.message,
+        ),
+      );
+    } catch (_) {
+      emit(
+        const AuthFailure(
+          'Unable to sign in with Google. Please try again.',
+        ),
+      );
     }
   }
 
-  // ===============================================================
+  // ==========================================================================
   // RESET PASSWORD
-  // ===============================================================
+  // ==========================================================================
 
   Future<String?> resetPassword(
       String email,
       ) async {
-    emit(AuthLoading());
+    emit( AuthLoading());
 
-    final failure = await resetUseCase(
-      email.trim(),
-    );
+    try {
+      final failure = await resetUseCase(
+        email.trim(),
+      );
 
-    if (failure != null) {
+      if (failure != null) {
+        emit(
+          AuthFailure(
+            failure.message,
+          ),
+        );
+
+        return failure.message;
+      }
+
+      // Password reset does NOT log the user out.
+      emit(
+        const PasswordResetSuccess(),
+      );
+
+      return null;
+    } on AppFailure catch (failure) {
       emit(
         AuthFailure(
           failure.message,
@@ -158,49 +247,69 @@ class AuthCubit extends Cubit<AuthState> {
       );
 
       return failure.message;
+    } catch (_) {
+      const message =
+          'Unable to send password reset email.';
+
+      emit(
+        const AuthFailure(message),
+      );
+
+      return message;
     }
-
-    // Password reset succeeded.
-    // Do not change the authentication state.
-    emit(
-      const PasswordResetSuccess(),
-    );
-
-    return null;
   }
 
-  // ===============================================================
+  // ==========================================================================
   // LOGOUT
-  // ===============================================================
+  // ==========================================================================
 
   Future<void> logout() async {
     emit(AuthLoading());
 
-    final failure = await signOutUseCase();
+    try {
+      final failure = await signOutUseCase();
 
-    if (failure != null) {
+      if (failure != null) {
+        emit(
+          AuthFailure(
+            failure.message,
+          ),
+        );
+
+        return;
+      }
+
+      // Do not manually emit Unauthenticated here.
+      //
+      // Firebase authStateChanges() will emit null,
+      // which will cause _listenToAuthState() to emit
+      // Unauthenticated().
+    } on AppFailure catch (failure) {
       emit(
         AuthFailure(
           failure.message,
         ),
       );
-
-      return;
+    } catch (_) {
+      emit(
+        const AuthFailure(
+          'Unable to sign out. Please try again.',
+        ),
+      );
     }
-
-    // Firebase authStateChanges() will normally
-    // emit null and transition the application to
-    // Unauthenticated.
   }
 
-  // ===============================================================
+  // ==========================================================================
   // CLOSE
-  // ===============================================================
+  // ==========================================================================
 
   @override
   Future<void> close() async {
     await _subscription?.cancel();
+    _subscription = null;
 
     return super.close();
   }
 }
+
+
