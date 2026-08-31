@@ -254,7 +254,7 @@ class EmployeeGrid extends StatelessWidget {
   final ValueChanged<Employee> onView;
   final ValueChanged<Employee> onEdit;
   final ValueChanged<Employee> onDelete;
-  final Future<void> Function()? onRefresh;
+  final Future<void> Function() onRefresh;
 
   const EmployeeGrid({
     super.key,
@@ -262,7 +262,7 @@ class EmployeeGrid extends StatelessWidget {
     required this.onView,
     required this.onEdit,
     required this.onDelete,
-    this.onRefresh,
+    required this.onRefresh,
   });
 
   @override
@@ -277,7 +277,7 @@ class EmployeeGrid extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
 
-        final int columns;
+        int columns;
 
         if (width >= 1200) {
           columns = 4;
@@ -289,16 +289,31 @@ class EmployeeGrid extends StatelessWidget {
           columns = 1;
         }
 
+        // Give every card enough vertical space.
+        final double cardHeight;
+
+        if (columns == 1) {
+          cardHeight = 285;
+        } else if (columns == 2) {
+          cardHeight = 290;
+        } else {
+          cardHeight = 300;
+        }
+
         return RefreshIndicator(
-          onRefresh: onRefresh ?? () async {},
+          onRefresh: onRefresh,
           child: GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate:
+            SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: columns,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: columns == 1 ? 1.7 : 1.35,
+
+              // IMPORTANT:
+              // Use fixed height instead of childAspectRatio.
+              mainAxisExtent: cardHeight,
             ),
             itemCount: employees.length,
             itemBuilder: (context, index) {
@@ -370,32 +385,48 @@ class EmployeeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
+      elevation: 1,
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // -------------------------------------------------------
+            // Employee Header
+            // -------------------------------------------------------
+
             Row(
               children: [
                 CircleAvatar(
+                  radius: 24,
                   child: Text(
-                    employee.name.isEmpty
+                    employee.name.trim().isEmpty
                         ? 'E'
-                        : employee.name[0].toUpperCase(),
+                        : employee.name
+                        .trim()
+                        .substring(0, 1)
+                        .toUpperCase(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+
                 const SizedBox(width: 12),
+
                 Expanded(
                   child: Text(
-                    employee.name,
+                    employee.name.isEmpty
+                        ? 'Unknown Employee'
+                        : employee.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -403,7 +434,11 @@ class EmployeeCard extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+
+            // -------------------------------------------------------
+            // Employee Information
+            // -------------------------------------------------------
 
             _InfoRow(
               icon: Icons.email_outlined,
@@ -422,15 +457,21 @@ class EmployeeCard extends StatelessWidget {
 
             _InfoRow(
               icon: Icons.location_on_outlined,
-              value:
-              '${employee.state}, ${employee.district}',
+              value: _locationText(),
             ),
 
             const Spacer(),
 
+            // -------------------------------------------------------
+            // Actions
+            // -------------------------------------------------------
+
+            const Divider(height: 1),
+
+            const SizedBox(height: 4),
+
             Row(
-              mainAxisAlignment:
-              MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
                   tooltip: 'View employee',
@@ -439,6 +480,7 @@ class EmployeeCard extends StatelessWidget {
                     Icons.visibility_outlined,
                   ),
                 ),
+
                 IconButton(
                   tooltip: 'Edit employee',
                   onPressed: onEdit,
@@ -446,6 +488,7 @@ class EmployeeCard extends StatelessWidget {
                     Icons.edit_outlined,
                   ),
                 ),
+
                 IconButton(
                   tooltip: 'Delete employee',
                   onPressed: onDelete,
@@ -459,6 +502,25 @@ class EmployeeCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _locationText() {
+    final state = employee.state.trim();
+    final district = employee.district.trim();
+
+    if (state.isEmpty && district.isEmpty) {
+      return 'Location not available';
+    }
+
+    if (state.isEmpty) {
+      return district;
+    }
+
+    if (district.isEmpty) {
+      return state;
+    }
+
+    return '$state, $district';
   }
 }
 
